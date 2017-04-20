@@ -144,7 +144,7 @@
 #define HAVE_LIBSDL2_IMAGE 1
 
 /* Define if you have the PCRE library */
-#define HAVE_LIBPCREPOSIX 1
+/* #define HAVE_LIBPCREPOSIX 1 */
 
 /* Define if you want to use FBO for some tricks in OpenGL */
 #define USE_FBO_TECHNIQUE 1
