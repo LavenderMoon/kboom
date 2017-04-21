@@ -3,7 +3,7 @@ rem set CYGWIN=c:\cygwin
 copy VisualC2015\Release\prboom-plus.exe release\kboom-sw.exe
 copy VisualC2015\ReleaseNOASMGL\glboom-plus.exe release\kboom-gl.exe
 copy VisualC2015\ReleaseServer\prboom-plus_server.exe release\kboom-server.exe
-copy data\prboom-plus.wad release
+copy data\prboom-plus.wad release\kboom.wad
 copy src\SDL\lib\x86\libFLAC-8.dll release
 copy src\SDL\lib\x86\libjpeg-9.dll release
 copy src\SDL\lib\x86\libmodplug-1.dll release

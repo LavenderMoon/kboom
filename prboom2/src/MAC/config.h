@@ -1,9 +1,9 @@
 /**/
 /* Define to the full name of this package. */
-#define PACKAGE_NAME "PrBoom-Plus"
+#define PACKAGE_NAME "KBoom"
 
 /* Define to the one symbol short name of this package. */
-#define PACKAGE_TARNAME "prboom-plus"
+#define PACKAGE_TARNAME "kboom"
 
 /* Define to the version of this package. */
 #define PACKAGE_VERSION "2.5.1.5"

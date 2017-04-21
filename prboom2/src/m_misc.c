@@ -1474,9 +1474,9 @@ void M_LoadDefaults (void)
   // check for a custom default file
 
 #if ((defined GL_DOOM) && (defined _MSC_VER))
-#define BOOM_CFG "glboom-plus.cfg"
+#define BOOM_CFG "kboom-gl.cfg"
 #else
-#define BOOM_CFG "prboom-plus.cfg"
+#define BOOM_CFG "kboom-sw.cfg"
 #endif
 
   i = M_CheckParm ("-config");
@@ -1615,7 +1615,7 @@ void M_LoadDefaults (void)
      doesn't overlap with the cfg settings */
   //e6y: Check on existence of prboom.wad
   if (!(wad_files[0] = I_FindFile(PACKAGE_TARNAME ".wad", "")))
-    I_Error("PrBoom-Plus.wad not found. Can't continue.");
+    I_Error(PACKAGE_TARNAME ".wad not found. Can't continue.");
 }
 
 
