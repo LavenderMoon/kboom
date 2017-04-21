@@ -17,9 +17,9 @@ except ImportError:
 from pprint import pprint
 
 url_lookup = {
-    'COMPETN': 'ftp://competn.doom2.net:8002/pub/compet-n',
+    'COMPETN': 'http://archive.org/download/competn/competn.zip',
     'IDGAMES': 'http://www.gamers.org/pub/idgames',
-    'SDA': 'ftp://competn.doom2.net:8002/pub/sda',
+    'SDA': 'http://archive.org/download/competn/sda.zip',
 }
 
 basepath = None
@@ -99,7 +99,7 @@ def runtest(iwad, demo, demopath, pwad):
     use_pipe = False
     if sys.platform == 'win32':
         os.chdir(os.path.join(basepath, 'release'))
-        executable = 'prboom'
+        executable = 'kboom-sw'
         iwadpath = iwad
         use_pipe = False
     elif sys.platform == 'darwin':
@@ -134,7 +134,7 @@ def runtest(iwad, demo, demopath, pwad):
             if len(results):
                 print results[-1]
         except IOError:
-            print "couldn't open stderr.txt"
+            print "couldn't open stderr.txt in the release directory"
     else:
         p = subprocess.Popen(options, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (stdout, stderr) = p.communicate()
