@@ -25,6 +25,7 @@
 #include "m_misc.h"
 #include "g_game.h"
 #include "doomdef.h"
+#include "doomstat.h"
 
 /*
 UMAOINFO uses an INI-like format,
@@ -37,6 +38,7 @@ value is either an identifier, a number (only doubles are stored) or a string li
 Comments must be in C++-form, i.e. from '//' until the end of the line.
 */
 
+void M_AddEpisode(const char *map, char *def);
 
 struct MapList Maps;
 
@@ -49,6 +51,163 @@ struct ParseState
 	umapinfo_errorfunc ErrorFunction;
 };
 
+
+//==========================================================================
+//
+// The Doom actors in their original order
+// Names are the same as in ZDoom.
+//
+//==========================================================================
+
+static const char * const ActorNames[] =
+{
+	"DoomPlayer",
+	"ZombieMan",
+	"ShotgunGuy",
+	"Archvile",
+	"ArchvileFire",
+	"Revenant",
+	"RevenantTracer",
+	"RevenantTracerSmoke",
+	"Fatso",
+	"FatShot",
+	"ChaingunGuy",
+	"DoomImp",
+	"Demon",
+	"Spectre",
+	"Cacodemon",
+	"BaronOfHell",
+	"BaronBall",
+	"HellKnight",
+	"LostSoul",
+	"SpiderMastermind",
+	"Arachnotron",
+	"Cyberdemon",
+	"PainElemental",
+	"WolfensteinSS",
+	"CommanderKeen",
+	"BossBrain",
+	"BossEye",
+	"BossTarget",
+	"SpawnShot",
+	"SpawnFire",
+	"ExplosiveBarrel",
+	"DoomImpBall",
+	"CacodemonBall",
+	"Rocket",
+	"PlasmaBall",
+	"BFGBall",
+	"ArachnotronPlasma",
+	"BulletPuff",
+	"Blood",
+	"TeleportFog",
+	"ItemFog",
+	"TeleportDest",
+	"BFGExtra",
+	"GreenArmor",
+	"BlueArmor",
+	"HealthBonus",
+	"ArmorBonus",
+	"BlueCard",
+	"RedCard",
+	"YellowCard",
+	"YellowSkull",
+	"RedSkull",
+	"BlueSkull",
+	"Stimpack",
+	"Medikit",
+	"Soulsphere",
+	"InvulnerabilitySphere",
+	"Berserk",
+	"BlurSphere",
+	"RadSuit",
+	"Allmap",
+	"Infrared",
+	"Megasphere",
+	"Clip",
+	"ClipBox",
+	"RocketAmmo",
+	"RocketBox",
+	"Cell",
+	"CellPack",
+	"Shell",
+	"ShellBox",
+	"Backpack",
+	"BFG9000",
+	"Chaingun",
+	"Chainsaw",
+	"RocketLauncher",
+	"PlasmaRifle",
+	"Shotgun",
+	"SuperShotgun",
+	"TechLamp",
+	"TechLamp2",
+	"Column",
+	"TallGreenColumn",
+	"ShortGreenColumn",
+	"TallRedColumn",
+	"ShortRedColumn",
+	"SkullColumn",
+	"HeartColumn",
+	"EvilEye",
+	"FloatingSkull",
+	"TorchTree",
+	"BlueTorch",
+	"GreenTorch",
+	"RedTorch",
+	"ShortBlueTorch",
+	"ShortGreenTorch",
+	"ShortRedTorch",
+	"Slalagtite",
+	"TechPillar",
+	"CandleStick",
+	"Candelabra",
+	"BloodyTwitch",
+	"Meat2",
+	"Meat3",
+	"Meat4",
+	"Meat5",
+	"NonsolidMeat2",
+	"NonsolidMeat4",
+	"NonsolidMeat3",
+	"NonsolidMeat5",
+	"NonsolidTwitch",
+	"DeadCacodemon",
+	"DeadMarine",
+	"DeadZombieMan",
+	"DeadDemon",
+	"DeadLostSoul",
+	"DeadDoomImp",
+	"DeadShotgunGuy",
+	"GibbedMarine",
+	"GibbedMarineExtra",
+	"HeadsOnAStick",
+	"Gibs",
+	"HeadOnAStick",
+	"HeadCandles",
+	"DeadStick",
+	"LiveStick",
+	"BigTree",
+	"BurningBarrel",
+	"HangNoGuts",
+	"HangBNoBrain",
+	"HangTLookingDown",
+	"HangTSkull",
+	"HangTLookingUp",
+	"HangTNoBrain",
+	"ColonGibs",
+	"SmallBloodPool",
+	"BrainStem",
+	//Boom/MBF additions
+	"PointPusher",
+	"PointPuller",
+	"MBFHelperDog",
+	"PlasmaBall1",
+	"PlasmaBall2",
+	"EvilSceptre",
+	"UnholyBible",
+	NULL
+};
 
 
 // -----------------------------------------------
@@ -85,6 +244,7 @@ static void FreeMap(struct MapEntry *mape)
 	if (mape->intertext) free(mape->intertext);
 	if (mape->intertextsecret) free(mape->intertextsecret);
 	if (mape->properties) free(mape->properties);
+	if (mape->bossactions) free(mape->bossactions);
 	mape->propertycount = 0;
 	mape->mapname = NULL;
 	mape->properties = NULL;
@@ -149,16 +309,18 @@ static char *ParseIdentifier(struct ParseState *state, int error)
 {
 	if (isalpha(*state->position))
 	{
+		size_t i, size;
+		char *copiedstring;
 		const unsigned char *startpos = state->position;
 		while (isalnum(*state->position) || *state->position == '_')
 		{
 			state->position++;
 			if (state->position == state->end) break;
 		}
-		size_t size = state->position - startpos;
-		char *copiedstring = (char*)malloc(size + 1);
+		size = state->position - startpos;
+		copiedstring = (char*)malloc(size + 1);
 		assert(copiedstring != NULL);
-		for(size_t i = 0; i < size; i++)
+		for(i = 0; i < size; i++)
 		{
 			int c = startpos[i];
 			if (!isalpha(c)) copiedstring[i] = (char)c;
@@ -186,6 +348,8 @@ static char *ParseString(struct ParseState *state, int error)
 	int firstchar = *state->position;
 	if (firstchar == '"')
 	{
+		size_t size;
+		char *copiedstring;
 		const unsigned char *startpos = ++state->position;
 		while (*state->position != '"')
 		{
@@ -209,8 +373,8 @@ static char *ParseString(struct ParseState *state, int error)
 				return NULL;	// reached the end of the line.
 			}
 		}
-		size_t size = state->position - startpos;
-		char *copiedstring = (char*)malloc(size + 1);
+		size = state->position - startpos;
+		copiedstring = (char*)malloc(size + 1);
 		assert(copiedstring != NULL);
 
 		memcpy(copiedstring, startpos, size);
@@ -246,6 +410,18 @@ static char *ParseString(struct ParseState *state, int error)
 static char *ParseMultiString(struct ParseState *state, int error)
 {
 	char *build = NULL;
+	if (*state->position == 'c' && state->end - state->position > 5)
+	{
+		char cmp[6];
+		memcpy(cmp, state->position, 5);
+		cmp[5] = 0;
+		if (!stricmp(cmp, "clear"))
+		{
+			state->position += 5;
+			return strdup("-");	// this was explicitly deleted to override the default.
+		}
+	}
+
 	for (;;)
 	{
 		char *str = ParseString(state, error);
@@ -257,14 +433,17 @@ static char *ParseMultiString(struct ParseState *state, int error)
 		if (build == NULL) build = str;
 		else
 		{
-			size_t newlen = strlen(build) + strlen(str);
+			size_t oldlen = strlen(build);
+			size_t newlen = oldlen + strlen(str) + 1;
 
 			build = realloc(build, newlen);
-			strcpy(build + strlen(build), str);
+			build[oldlen] = '\n';
+			strcpy(build + oldlen + 1, str);
 			build[newlen] = 0;
 		}
 		SkipWhitespace(state, false);
 		if (*state->position != ',') return build;
+		state->position++;
 		SkipWhitespace(state, true);
 	}
 }
@@ -281,6 +460,7 @@ static int ParseLumpName(struct ParseState *state, char *buffer, int error)
 	int firstchar = *state->position;
 	if (firstchar == '"')
 	{
+		size_t size;
 		const unsigned char *startpos = ++state->position;
 		while (*state->position != '"')
 		{
@@ -293,7 +473,7 @@ static int ParseLumpName(struct ParseState *state, char *buffer, int error)
 				return 0;	// reached the end of the line.
 			}
 		}
-		size_t size = state->position - startpos;
+		size = state->position - startpos;
 		if (size > 8)
 		{
 			state->error = 1;
@@ -348,6 +528,8 @@ static double ParseFloat(struct ParseState *state)
 
 static long ParseInt(struct ParseState *state, int allowbool)
 {
+	const unsigned char *newpos;
+	long value;
 	if (allowbool && (tolower(*state->position) == 't' || tolower(*state->position) == 'f'))
 	{
 		char *id = ParseIdentifier(state, 1);
@@ -371,8 +553,7 @@ static long ParseInt(struct ParseState *state, int allowbool)
 			return 0;
 		}
 	}
-	const unsigned char *newpos;
-	long value = strtol((char*)state->position, (char**)&newpos, 0);
+	value = strtol((char*)state->position, (char**)&newpos, 0);
 	if (newpos == state->position)
 	{
 		state->error = 1;
@@ -385,6 +566,7 @@ static long ParseInt(struct ParseState *state, int allowbool)
 		state->ErrorFunction("Syntax error in line %u: numeric constant followed by invalid characters", state->line);
 		return 0;
 	}
+	state->position = newpos;
 	return value;
 }
 
@@ -456,6 +638,36 @@ static int ParseAssign(struct ParseState *state)
 
 // -----------------------------------------------
 //
+// Parses an assignment operator
+//
+// -----------------------------------------------
+
+static int ParseComma(struct ParseState *state)
+{
+	if (SkipWhitespace(state, false))
+	{
+		state->error = 1;
+		state->ErrorFunction("',' expected in line %u", state->line);
+		return 0;
+	}
+	if (*state->position != ',')
+	{
+		state->error = 1;
+		state->ErrorFunction("',' expected in line %u", state->line);
+		return 0;
+	}
+	state->position++;
+	if (SkipWhitespace(state, false))
+	{
+		state->error = 1;
+		state->ErrorFunction("Unexpected end of file %u", state->line);
+		return 0;
+	}
+	return 1;
+}
+
+// -----------------------------------------------
+//
 // Parses a map property of the form 
 // 'property = value1 [, value2...]'
 //
@@ -463,11 +675,12 @@ static int ParseAssign(struct ParseState *state)
 
 static int ParseMapProperty(struct ParseState *state, struct MapProperty *val)
 {
+	char *pname;
 	// find the next line with content.
 	while (state->position < state->end && SkipWhitespace(state, false));
 	// this line is no property.
 	if (*state->position == '[' || state->position >= state->end) return 0;
-	char *pname = ParseIdentifier(state, 1);
+	pname = ParseIdentifier(state, 1);
 	val->propertyname = pname;
 
 	if (pname == NULL)
@@ -510,13 +723,16 @@ static int ParseMapProperty(struct ParseState *state, struct MapProperty *val)
 
 static int ParseStandardProperty(struct ParseState *state, struct MapEntry *mape)
 {
+	const unsigned char *savedpos;
+	char *pname;
+
 	// find the next line with content.
 	while (state->position < state->end && SkipWhitespace(state, false));
 	// this line is no property.
 	if (*state->position == '[' || state->position >= state->end) return 0;
 	
-	const unsigned char *savedpos = state->position;
-	char *pname = ParseIdentifier(state, 0);
+	savedpos = state->position;
+	pname = ParseIdentifier(state, 0);
 	if (pname == 0) return 0;
 	if (!ParseAssign(state)) return 0;
 	if (!stricmp(pname, "levelname"))
@@ -562,6 +778,21 @@ static int ParseStandardProperty(struct ParseState *state, struct MapEntry *mape
 	{
 		ParseLumpName(state, mape->endpic, 1);
 	}
+	else if (!stricmp(pname, "endcast"))
+	{
+		if (ParseInt(state, true)) strcpy(mape->endpic, "$CAST");
+		else strcpy(mape->endpic, "-");
+	}
+	else if (!stricmp(pname, "endbunny"))
+	{
+		if (ParseInt(state, true)) strcpy(mape->endpic, "$BUNNY");
+		else strcpy(mape->endpic, "-");
+	}
+	else if (!stricmp(pname, "endgame"))
+	{
+		if (ParseInt(state, true)) strcpy(mape->endpic, "!");
+		else strcpy(mape->endpic, "-");
+	}
 	else if (!stricmp(pname, "exitpic"))
 	{
 		ParseLumpName(state, mape->exitpic, 1);
@@ -600,6 +831,56 @@ static int ParseStandardProperty(struct ParseState *state, struct MapEntry *mape
 	{
 		ParseLumpName(state, mape->intermusic, 1);
 	}
+	else if (!stricmp(pname, "episode"))
+	{
+		char *lname = ParseMultiString(state, 1);
+		if (!lname) return 0;
+		M_AddEpisode(mape->mapname, lname);
+	}
+	else if (!stricmp(pname, "bossaction"))
+	{
+		char * classname = ParseIdentifier(state, true);
+		int classnum, special, tag;
+		if (!stricmp(classname, "clear"))
+		{
+			// mark level free of boss actions
+			classnum = special = tag = -1;
+			if (mape->bossactions) free(mape->bossactions);
+			mape->bossactions = NULL;
+			mape->numbossactions = -1;
+		}
+		else
+		{
+			int i;
+			for (i = 0; ActorNames[i]; i++)
+			{
+				if (!stricmp(classname, ActorNames[i])) break;
+			}
+			if (ActorNames[i] == NULL)
+			{
+				state->error = 1;
+				state->ErrorFunction("Unknown thing type %s in line %d", classname, state->line);
+				return 0;
+			}
+
+			ParseComma(state);
+			special = ParseInt(state, false);
+			ParseComma(state);
+			tag = ParseInt(state, false);
+			// allow no 0-tag specials here, unless a level exit.
+			if (tag != 0 || special == 11 || special == 51 || special == 52 || special == 124)
+			{
+				if (mape->numbossactions == -1) mape->numbossactions = 1;
+				else mape->numbossactions++;
+				mape->bossactions = (struct BossAction *)realloc(mape->bossactions, sizeof(struct BossAction) * mape->numbossactions);
+				mape->bossactions[mape->numbossactions - 1].type = i;
+				mape->bossactions[mape->numbossactions - 1].special = special;
+				mape->bossactions[mape->numbossactions - 1].tag = tag;
+			}
+
+		}
+		free(classname);
+	}
 	else
 	{
 		state->position = savedpos;
@@ -618,6 +899,8 @@ static int ParseStandardProperty(struct ParseState *state, struct MapEntry *mape
 
 static int ParseMapEntry(struct ParseState *state, struct MapEntry *val)
 {
+	char *pname;
+
 	val->mapname = NULL;
 	val->propertycount = 0;
 	val->properties = NULL;
@@ -631,7 +914,7 @@ static int ParseMapEntry(struct ParseState *state, struct MapEntry *val)
 		return 0;
 	}
 	state->position++;
-	char *pname = ParseIdentifier(state, 1);
+	pname = ParseIdentifier(state, 1);
 	val->mapname = pname;
 	if (pname == NULL)
 	{
@@ -683,7 +966,6 @@ static int ParseMapEntry(struct ParseState *state, struct MapEntry *val)
 	}
 }
 
-
 // -----------------------------------------------
 //
 // Parses a complete UMAPINFO lump
@@ -716,6 +998,32 @@ int ParseUMapInfo(const unsigned char *buffer, size_t length, umapinfo_errorfunc
 			FreeMapList();
 			free(newbuffer);
 			return 0;
+		}
+
+		// Set default level progression here to simplify the checks elsewhere. Doing this lets us skip all normal code for this if nothing has been defined.
+		if (parsed.endpic[0])
+		{
+			parsed.nextmap[0] = parsed.nextsecret[0] = 0;
+			if (parsed.endpic[0] == '!') parsed.endpic[0] = 0;
+		}
+		if (!parsed.nextmap[0] && !parsed.endpic[0])
+		{
+			if (!stricmp(parsed.mapname, "MAP30")) strcpy(parsed.endpic, "$CAST");
+			else if (!stricmp(parsed.mapname, "E1M8"))  strcpy(parsed.endpic, gamemode == retail? "CREDIT" : "HELP2");
+			else if (!stricmp(parsed.mapname, "E2M8"))  strcpy(parsed.endpic, "VICTORY");
+			else if (!stricmp(parsed.mapname, "E3M8"))  strcpy(parsed.endpic, "$BUNNY");
+			else if (!stricmp(parsed.mapname, "E4M8"))  strcpy(parsed.endpic, "ENDPIC");
+			else if (gamemission == chex && !stricmp(parsed.mapname, "E1M5"))  strcpy(parsed.endpic, "CREDIT");
+			else
+			{
+				int ep, map;
+				G_ValidateMapName(parsed.mapname, &ep, &map);
+				map++;
+				if (gamemode == commercial)
+					sprintf(parsed.nextmap, "MAP%02d", map);
+				else
+					sprintf(parsed.nextmap, "E%dM%d", ep, map);
+			}
 		}
 
 		// Does this property already exist? If yes, replace it.
